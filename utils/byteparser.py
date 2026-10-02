@@ -54,9 +54,3 @@ def read_varint(data: bytes, offset: int) -> tuple[int, int]:
     decoded = (value >> 1) ^ -(value & 1)
     
     return decoded, offset    
-
-
-
-
-    
-    

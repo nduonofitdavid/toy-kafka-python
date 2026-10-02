@@ -1,11 +1,10 @@
 from dataclasses import dataclass
 import uuid
 from enum import IntEnum
-from .utils.byteparser import encode_unsigned_varint, encode_varint
+from utils.byteparser import encode_unsigned_varint, encode_varint
 
 
 # enums
-
 class ErrorCodes(IntEnum):
     NO_ERROR=0
     UNKNOWN_TOPIC_OR_PARTITION=3
@@ -17,15 +16,8 @@ class RecordTypeEnum(IntEnum):
     
     
 # classes
-
 class APIVersion:
-    def __init__(
-        self,
-        api_key: int,
-        min_support: int,
-        max_support: int,
-        about: str 
-    ):
+    def __init__(self, api_key: int, min_support: int, max_support: int, about: str):
         self.api_key = api_key.to_bytes(2, "big")
         self.min_support = min_support.to_bytes(2, "big")
         self.max_support = max_support.to_bytes(2, "big")
@@ -45,15 +37,7 @@ class APIVersion:
         )
         
 class APIVersionsResponse:
-    def __init__(
-        self,
-        correlation_id: bytes,
-        error_code: int,
-        api_keys_length: int,
-        api_keys: list[APIVersion],
-        api_keys_bc: int,
-        throttle_time: int,
-    ) -> None:
+    def __init__(self, correlation_id: bytes, error_code: int, api_keys_length: int, api_keys: list[APIVersion], api_keys_bc: int, throttle_time: int,) -> None:
         self.correlation_id = correlation_id
         self.error_code = error_code.to_bytes(2, "big")
         self.api_keys_length = api_keys_length.to_bytes(1, "big")
@@ -76,100 +60,8 @@ class APIVersionsResponse:
         )
         return response
 
-# to handle unknown topics, you can create a special topic class that
-# is set with the error stuff, it is then left for your to copy the topic name length, 
-# name, and topic authorized operations.
-
-class Topic:
-    def __init__(
-        self,
-        name: str,
-        is_internal: bool,
-        error_code: int,
-        partitions: list[Partition],
-        topic_id: uuid.UUID=uuid.UUID(int=0)
-    ) -> None:
-        self.topic_id = topic_id # 16 bytes to represent this.
-        self.name = name
-        self.name_len = len(self.name) + 1
-        self.is_internal = is_internal # 1 byte
-        self.partitions = partitions # for now encode length with 1 byte
-        self.topic_authorized_operations = 0 # int32, encode as 4 bytes
-        self.tag_buffer = 0 # encode as a single byte
-        self.error_code = error_code
-        
-        
-    def _get_partitions(self):
-        """
-        If there are partitions down the line, we will serialize
-        it directly from here.
-        """
-        
-        if self.partitions:
-            response = encode_unsigned_varint(len(self.partitions) + 1) + b"".join([partition.byte_representation for partition in self.partitions])
-            return response
-        else:
-            return (1).to_bytes(1, "big")
-    
-    @property
-    def byte_representation(self):
-            
-        return (
-            self.error_code.to_bytes(2, "big")
-            + encode_unsigned_varint(self.name_len)
-            + self.name.encode("utf-8")
-            + self.topic_id.bytes
-            + self.is_internal.to_bytes(1, "big")
-            + self._get_partitions()
-            + self.topic_authorized_operations.to_bytes(4, "big")
-            + self.tag_buffer.to_bytes(1, "big")
-        )
-        
-        
-        
-class DescribeTopicPartitionsResponse:
-    def __init__(
-        self,
-        correlation_id: bytes,
-        throttle_time: int,
-        topics_array: list[Topic],
-        next_cursor: int,
-    ):
-        self.correlation_id = correlation_id
-        self.throttle_time = throttle_time
-        self.topics_array = topics_array
-        self.next_cursor = next_cursor
-        self.tag_buffer = 0
-        
-    @property
-    def topic_arr_len(self):
-        return encode_unsigned_varint(len(self.topics_array) + 1)
-    
-    
-    def generate_response(self):
-        return (
-            self.correlation_id
-            + b"\x00"
-            + self.throttle_time.to_bytes(4, "big")
-            + self.topic_arr_len
-            + b"".join([topic.byte_representation for topic in self.topics_array])
-            + self.next_cursor.to_bytes(1, "big", signed=True)
-            + self.tag_buffer.to_bytes(1, "big")
-        )
-        
-
 class Partition:
-    def __init__(
-        self,
-        topic_id: uuid.UUID,
-        error_code: int,
-        partition_index: int,
-        leader_id: int,
-        leader_epoch: int,
-        replica_arrays: list[int],
-        isr_nodes: list[int],
-    ) -> None:
-        
+    def __init__(self, topic_id: uuid.UUID, error_code: int, partition_index: int, leader_id: int, leader_epoch: int, replica_arrays: list[int], isr_nodes: list[int],) -> None:
         self.topic_id = topic_id
         self.error_code = error_code
         self.partition_index = partition_index
@@ -219,33 +111,73 @@ class Partition:
             + self.next_cursor.to_bytes(1, "big", signed=True)
             + tag_buffer_bytes
         )
+
+class Topic:
+    def __init__(self, name: str, is_internal: bool, error_code: int, partitions: list[Partition], topic_id: uuid.UUID=uuid.UUID(int=0)) -> None:
+        self.topic_id = topic_id # 16 bytes to represent this.
+        self.name = name
+        self.name_len = len(self.name) + 1
+        self.is_internal = is_internal # 1 byte
+        self.partitions = partitions # for now encode length with 1 byte
+        self.topic_authorized_operations = 0 # int32, encode as 4 bytes
+        self.tag_buffer = 0 # encode as a single byte
+        self.error_code = error_code
         
         
-class RecordHeader:
-    def __init__(
-        self,
-        header_key_length: int,
-        header_key: str,
-        header_value_length: int,
-        value: str
-    ):
-        ...
-        # ignore for now, later on add support for record headers
+    def _get_partitions(self):
+        """
+        If there are partitions down the line, we will serialize
+        it directly from here.
+        """
         
+        if self.partitions:
+            response = encode_unsigned_varint(len(self.partitions) + 1) + b"".join([partition.byte_representation for partition in self.partitions])
+            return response
+        else:
+            return (1).to_bytes(1, "big")
+    
+    @property
+    def byte_representation(self):
+            
+        return (
+            self.error_code.to_bytes(2, "big")
+            + encode_unsigned_varint(self.name_len)
+            + self.name.encode("utf-8")
+            + self.topic_id.bytes
+            + self.is_internal.to_bytes(1, "big")
+            + self._get_partitions()
+            + self.topic_authorized_operations.to_bytes(4, "big")
+            + self.tag_buffer.to_bytes(1, "big")
+        )
+        
+        
+        
+class DescribeTopicPartitionsResponse:
+    def __init__(self, correlation_id: bytes, throttle_time: int, topics_array: list[Topic], next_cursor: int,):
+        self.correlation_id = correlation_id
+        self.throttle_time = throttle_time
+        self.topics_array = topics_array
+        self.next_cursor = next_cursor
+        self.tag_buffer = 0
+        
+    @property
+    def topic_arr_len(self):
+        return encode_unsigned_varint(len(self.topics_array) + 1)
+    
+    def generate_response(self):
+        return (
+            self.correlation_id
+            + b"\x00"
+            + self.throttle_time.to_bytes(4, "big")
+            + self.topic_arr_len
+            + b"".join([topic.byte_representation for topic in self.topics_array])
+            + self.next_cursor.to_bytes(1, "big", signed=True)
+            + self.tag_buffer.to_bytes(1, "big")
+        )
+          
 
 class Record:
-    def __init__(
-        self,
-        record_size: int, # signed var int
-        attributes: int, # 1 byte
-        timestamp_delta: int, # signed var int
-        offset_delta: int, # signed var int
-        key_length: int, # signed var int
-        value_length: int, # signed var int
-        value: str, # encoded using utf-8
-        headers_count: int, # signed var int
-        key: str | None = None,
-    ) -> None:
+    def __init__(self, record_size: int, attributes: int, timestamp_delta: int, offset_delta: int, key_length: int, value_length: int, value: str, headers_count: int, key: str | None = None,) -> None:
         self.record_size = record_size
         self.attributes = attributes
         self.timestamp_delta = timestamp_delta
@@ -272,22 +204,7 @@ class Record:
     
 
 class RecordBatch:
-    def __init__(
-        self,
-        base_offset: int, # 8 bytes
-        batch_size: int, # 4 bytes
-        part_leader_epoch: int, # 4 bytes
-        magic_byte: int, # 1 byte
-        crc_32: int, # 4 bytes
-        attributes: int, # 2 bytes
-        last_offset_delta: int, # 4 bytes
-        first_timestamp: int, # 8 bytes
-        last_timestamp: int, # 8 bytes
-        producer_id: int, # 8 bytes
-        producer_epoch: int, # 2 bytes
-        base_sequence: int, # 4 bytes,
-        records_array: list[Record], # encode the array len in 4 bytes
-    ) -> None:
+    def __init__(self, base_offset: int, batch_size: int, part_leader_epoch: int, magic_byte: int, crc_32: int, attributes: int, last_offset_delta: int, first_timestamp: int, last_timestamp: int, producer_id: int, producer_epoch: int, base_sequence: int, records_array: list[Record],) -> None:
         self.base_offset = base_offset
         self.batch_size = batch_size
         self.part_leader_epoch = part_leader_epoch
@@ -325,16 +242,7 @@ class ProduceRecRes:
     ...    
  
 class ProducePartRes:
-    def __init__(
-        self,
-        partition_id: int, # 4 byte
-        error_code: int, # 2 byte
-        base_offset: int, # 8 bytes
-        log_append_time: int, # 8 bytes
-        log_start_offset: int, # 8 bytes
-        error_msg: str | None = None,
-        records_err: list[ProduceRecRes] | None = None, 
-    )-> None:
+    def __init__(self, partition_id: int, error_code: int, base_offset: int, log_append_time: int, log_start_offset: int, error_msg: str | None = None, records_err: list[ProduceRecRes] | None = None)-> None:
         self.partition_id = partition_id
         self.error_code = error_code
         self.base_offset = base_offset
@@ -352,7 +260,6 @@ class ProducePartRes:
     def _get_error_msg(self) -> bytes:
         # so we allowed string to be None because it uses less memory compared to an empty string
         if self.error_msg:
-            # I am not sure if I am encoding the length of the message correctly, it is null in the challenge anyways
             return (
                 b"" + encode_unsigned_varint((len(self.error_msg) + 1))
                 + self.error_msg.encode(encoding="utf-8")
@@ -374,11 +281,7 @@ class ProducePartRes:
         )
 
 class ProduceTopicRes:
-    def __init__(
-        self,
-        topic_name: str, 
-        partitions_arr: list[ProducePartRes]
-    ) -> None:
+    def __init__(self, topic_name: str, partitions_arr: list[ProducePartRes]) -> None:
         self.topic_name = topic_name
         self.partitions_arr = partitions_arr
         
@@ -397,12 +300,7 @@ class ProduceTopicRes:
         
 
 class ProduceResponseV11:
-    def __init__(
-        self,
-        correlation_id: int, # 4 bytes
-        topic_response: list[ProduceTopicRes],
-        throttle_time: int
-    ):
+    def __init__(self, correlation_id: int, topic_response: list[ProduceTopicRes], throttle_time: int):
         self.correlation_id = correlation_id
         self.topic_response = topic_response
         self.throttle_time = throttle_time
@@ -467,39 +365,17 @@ class DescRequestBodyD:
 # instantiations
     
     
-fetch = APIVersion(
-    api_key=17,
-    min_support=0,
-    max_support=4,
-    about=""
-)
+fetch = APIVersion(api_key=17, min_support=0, max_support=4, about="")
 
-apiversions = APIVersion(
-    api_key=18,
-    min_support=0,
-    max_support=4,
-    about="Returns information about all the apis and their versions"
-)
+apiversions = APIVersion(api_key=18, min_support=0, max_support=4, about="Returns information about all the apis and their versions")
 
-desc_tpic_part = APIVersion(
-    api_key=75,
-    min_support=0,
-    max_support=0,
-    about="Returns metadata about topics and their partitions"
-)
+desc_tpic_part = APIVersion(api_key=75, min_support=0, max_support=0, about="Returns metadata about topics and their partitions")
 
-produce_api = APIVersion(
-    api_key=0,
-    min_support=0,
-    max_support=11,
-    about="Allows sending streams of data to the topics in the kafka cluster"
-)
+produce_api = APIVersion(api_key=0, min_support=0, max_support=11, about="Allows sending streams of data to the topics in the kafka cluster")
 
 api_versions_arr = [fetch, apiversions, desc_tpic_part, produce_api]
 
-def calculate_total_bytes(
-    versions_array: list[APIVersion]
-):
+def calculate_total_bytes(versions_array: list[APIVersion]):
     total = 0
     for version in versions_array:
         total += version.total_bytes

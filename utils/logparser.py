@@ -1,5 +1,5 @@
 import uuid
-from ..model import Partition, RecordTypeEnum, TopicRecordD, RecordBatch, Record, RequestHeaderD, APIRequestBodyD, TopicD, DescRequestBodyD
+from model import Partition, RecordTypeEnum, TopicRecordD, RecordBatch, Record, RequestHeaderD, APIRequestBodyD, TopicD, DescRequestBodyD
 from .byteparser import *
 
 cluster_metadata_loaded = False

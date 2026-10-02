@@ -5,27 +5,13 @@ from collections import defaultdict
 
 import os
 
-from .model import (
-    APIVersionsResponse, 
-    API_KEY_VERSIONS, 
-    TOTAL_API_KEY_BC, 
-    API_KEYS_LEN,
-    Topic,
-    ErrorCodes,
-    DescribeTopicPartitionsResponse,
-    Partition,
-    ProducePartRes,
-    ProduceTopicRes,
-    ProduceResponseV11
-)
-
-from .utils.logparser import read_cluster_metadata, parse_produce_req_v11, parse_msg_header, parse_desc_tpc_part_body
+from model import APIVersionsResponse, API_KEY_VERSIONS, TOTAL_API_KEY_BC, API_KEYS_LEN, Topic, ErrorCodes, DescribeTopicPartitionsResponse, Partition, ProducePartRes, ProduceTopicRes, ProduceResponseV11
+from utils.logparser import read_cluster_metadata, parse_produce_req_v11, parse_msg_header, parse_desc_tpc_part_body
 
 # SOME CONSTANTS
 MSG_SIZE=4
 API_VERSIONS = (0, 1, 2, 3, 4)
 
-# hard coded for now, dynamic later
 CLUSTER_LOG_FILE = os.getenv("CLUSTER_LOG_PATH")
 LOG_DIR = os.getenv("LOG_DIR")
 

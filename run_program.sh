@@ -1,0 +1,1 @@
+CLUSTER_LOG_PATH=/home/nduonofit/work/toy-kafka/data/__cluster_metadata-0/00000000000000000000.log LOG_DIR=/home/nduonofit/work/codecrafters-kafka-python/app/data python3 main.py
